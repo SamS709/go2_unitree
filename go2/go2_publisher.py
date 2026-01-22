@@ -14,17 +14,25 @@ ros2 run huro sim_go2
 ros2 run huro go2_publisher.py --use_spacemouse True
 
 """
+import sys
+import os
+# Add parent directory to path to import controller and unitree_legged_const
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add grandparent directory to path to import unitree_sdk2_python
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+from controller.controller import ControllerMsg
 import numpy as np
 import torch
 import os
-from controller.controller import ControllerMsg
 from utils import Mapper
 from get_obs import get_obs_low_state
 import time
 import sys
 from unitree_sdk2_python.unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
 from unitree_sdk2_python.unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
+from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_
+
 from unitree_sdk2_python.unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_
 from unitree_sdk2_python.unitree_sdk2py.core.channel import ChannelPublisher, ChannelFactoryInitialize
 from unitree_sdk2_python.unitree_sdk2py.utils.crc import CRC
@@ -63,7 +71,7 @@ class Go2PolicyController:
         self.emergency_mode_start_time = None
         self.last_commanded_positions = None
 
-        policy_name = "policy_asymmetric.pt" if policy_name == None else policy_name
+        policy_name = "policy_asymmetric.pt"
 
         policy_path = os.path.join("resources", "models", policy_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -110,6 +118,7 @@ class Go2PolicyController:
         # Store latest messages
         self.latest_low_state = None
         self.controller_state = None
+        self.lidar_state = None
 
         self.kp = 60.0  # Position gain
         self.kd = 5.0  # Velocity gain
@@ -139,6 +148,9 @@ class Go2PolicyController:
 
         self.joy_sub = ChannelSubscriber("controller_input", ControllerMsg)
         self.joy_sub.Init(self.joy_callback, 10)
+
+        self.lidar_sub = ChannelSubscriber("rt/utlidar/cloud", PointCloud2_)
+        self.lidar_sub.Init(self.lidar_callback, 10)
 
         # create subscriber 
         self.low_state_sub = ChannelSubscriber("rt/lowstate", LowState_)
@@ -183,6 +195,10 @@ class Go2PolicyController:
     def joy_callback(self, msg: ControllerMsg):
         """Log spacemouse state"""
         self.controller_state = msg
+
+    def lidar_callback(self, msg: PointCloud2_):
+        """Log spacemouse state"""
+        self.lidar_state = msg
 
     def Start(self):
         self.lowCmdWriteThreadPtr = RecurrentThread(
@@ -334,6 +350,7 @@ class Go2PolicyController:
         obs = get_obs_low_state(
             self.latest_low_state,
             self.controller_state,
+            self.lidar_state,
             height=0.30,
             prev_actions=self.current_action,
             mapper=self.mapper,
@@ -364,10 +381,10 @@ def main():
     custom.Start()
 
     while True:        
-        if custom.percent_4 == 1.0: 
-           time.sleep(1)
-           print("Done!")
-           sys.exit(-1)     
+        # if custom.percent_4 == 1.0: 
+        #    time.sleep(1)
+        #    print("Done!")
+        #    sys.exit(-1)     
         time.sleep(1)
 
 

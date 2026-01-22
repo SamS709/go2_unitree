@@ -6,8 +6,10 @@ import numpy as np
 import yaml
 import os
 from utils import Mapper
-from ..controller.controller import ControllerMsg
+from controller.controller import ControllerMsg
 from unitree_sdk2_python.unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
+from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_
+from lidar_utils import pointcloud_to_heightmap, visualize_heightmap, visualize_obstacle_map
 
 from utils import quat_rotate_inverse
 
@@ -15,6 +17,7 @@ from utils import quat_rotate_inverse
 def get_obs_low_state(
     lowstate_msg: LowState_,
     controller_msg: ControllerMsg,
+    lidar_msg: PointCloud2_,
     height: float,
     prev_actions: np.array,
     mapper: Mapper,
@@ -41,7 +44,29 @@ def get_obs_low_state(
     """
 
     # MAPPING ROBOT -> POLICY
-
+    
+    # ========== CREATE HEIGHT MAP FROM LIDAR ==========
+    if lidar_msg is None:
+        print("\n[WARNING] lidar_msg is None - no data received\n")
+    elif len(lidar_msg.data) == 0:
+        print(f"\n[WARNING] lidar_msg received but data is empty (length={len(lidar_msg.data)})\n")
+    else:
+        try:
+            # Use the utility function to create height map
+            height_map, info = pointcloud_to_heightmap(lidar_msg, grid_size=80, map_range=4.0)
+            
+            # Visualize the height map
+            visualize_heightmap(height_map, info, show_full_stats=True)
+            
+            # Display obstacle map (binary: X=obstacle, O=clear)
+            visualize_obstacle_map(height_map, info, obstacle_threshold=0.15, display_range=2.0)
+            
+        except Exception as e:
+            print(f"\n[ERROR] Failed to create height map: {e}")
+            import traceback
+            traceback.print_exc()
+    # ===========================================
+    
     motor_states = lowstate_msg.motor_state[:12]
 
     current_joint_pos_sdk = np.array([motor_states[i].q for i in range(12)])
@@ -94,9 +119,9 @@ def get_obs_low_state(
     obs[6:9] = [
         controller_msg.ly * 3.0 / 4.0,  # forward velocity
         controller_msg.lx * 3.0 / 4.0,  # lateral velocity (flip for correct direction)
-        controller_msg.lx ,  # yaw rate
+        controller_msg.rx ,  # yaw rate
     ]
-    obs[9] = 0.3 + controller_msg.ly / 10
+    obs[9] = 0.3 + controller_msg.ry / 10
 
     # Fill joint positions (obs[13:25]) in policy order
     obs[10:22] = current_joint_pos_policy - default_pos_policy
@@ -111,6 +136,5 @@ def get_obs_low_state(
         float(lowstate_msg.foot_force[2]>20),
         float(lowstate_msg.foot_force[3]>20)
     ]
-    print(obs[46:50])
 
     return obs
