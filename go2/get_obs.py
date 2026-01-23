@@ -43,29 +43,36 @@ def get_obs_low_state(
     - obs[46:50] : Foot contacts
     """
 
+    # num_points = lidar_msg.width * lidar_msg.height
+    # point_step = lidar_msg.point_step
+    # print("num points: ", num_points)
+    # print("point_step: ", point_step)
+    # print(lidar_msg)
+
     # MAPPING ROBOT -> POLICY
     
-    # ========== CREATE HEIGHT MAP FROM LIDAR ==========
-    if lidar_msg is None:
-        print("\n[WARNING] lidar_msg is None - no data received\n")
-    elif len(lidar_msg.data) == 0:
-        print(f"\n[WARNING] lidar_msg received but data is empty (length={len(lidar_msg.data)})\n")
-    else:
-        try:
-            # Use the utility function to create height map
-            height_map, info = pointcloud_to_heightmap(lidar_msg, grid_size=80, map_range=4.0)
+    #========== CREATE HEIGHT MAP FROM LIDAR ==========
+    # print(lidar_msg)
+    # if lidar_msg is None:
+    #     print("\n[WARNING] lidar_msg is None - no data received\n")
+    # elif len(lidar_msg.data) == 0:
+    #     print(f"\n[WARNING] lidar_msg received but data is empty (length={len(lidar_msg.data)})\n")
+    # else:
+    #     try:
+    #         # Use the utility function to create height map
+    #         height_map, info = pointcloud_to_heightmap(lidar_msg, grid_size=80, map_range=4.0)
             
-            # Visualize the height map
-            visualize_heightmap(height_map, info, show_full_stats=True)
+    #         # Visualize the height map
+    #         visualize_heightmap(height_map, info, show_full_stats=True)
             
-            # Display obstacle map (binary: X=obstacle, O=clear)
-            visualize_obstacle_map(height_map, info, obstacle_threshold=0.15, display_range=2.0)
+    #         # Display obstacle map (binary: X=obstacle, O=clear)
+    #         visualize_obstacle_map(height_map, info, obstacle_threshold=0.15, display_range=2.0)
             
-        except Exception as e:
-            print(f"\n[ERROR] Failed to create height map: {e}")
-            import traceback
-            traceback.print_exc()
-    # ===========================================
+    #     except Exception as e:
+    #         print(f"\n[ERROR] Failed to create height map: {e}")
+    #         import traceback
+    #         traceback.print_exc()
+    # # ===========================================
     
     motor_states = lowstate_msg.motor_state[:12]
 
