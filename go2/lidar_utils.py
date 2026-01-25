@@ -4,6 +4,7 @@ Utility functions for processing LiDAR data and creating height maps.
 """
 
 import numpy as np
+from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_
 import struct
 
 
@@ -87,6 +88,44 @@ def pointcloud_to_heightmap(lidar_msg, grid_size=80, map_range=4.0):
     
     return height_map, info
 
+def process_height_map(height_map: np.array, lidar_msg: PointCloud2_, max_dist: float, delete_count: int = 100):
+    
+    grid_size = height_map.shape[0]
+    map_range = 2.0 * max_dist
+    cell_size = map_range / grid_size  # meters per cell
+    
+    # Parse pointcloud
+    num_points = lidar_msg.width * lidar_msg.height
+    point_step = lidar_msg.point_step
+    data_bytes = bytes(lidar_msg.data)
+    
+    # Increment age for all cells (vectorized)
+    height_map[:, :, 1] += 1
+    
+    # Project points onto grid
+    for i in range(num_points):
+        offset = i * point_step
+        x = struct.unpack_from('f', data_bytes, offset)[0]
+        y = struct.unpack_from('f', data_bytes, offset + 4)[0]
+        z = struct.unpack_from('f', data_bytes, offset + 8)[0]
+        
+        # Filter invalid points
+        if not (np.isfinite(x) and np.isfinite(y) and np.isfinite(z)):
+            continue
+        
+        # Convert to grid coordinates (robot at center)
+        grid_x = int((x + max_dist) / cell_size)
+        grid_y = int((y + max_dist) / cell_size)
+        
+        if 0 <= grid_x < map_range and 0 <= grid_y < map_range:
+            height_map[grid_x, grid_y, 0] = z
+            height_map[grid_x, grid_y, 1] = 0
+    
+    # Clear old data (cells not updated in delete_count frames)
+    old_cells = height_map[:, :, 1] > delete_count
+    height_map[old_cells, 0] = 0.0  # Reset height
+    height_map[old_cells, 1] = 0    # Reset age
+    
 
 def visualize_heightmap(height_map, info, show_full_stats=True):
     """
