@@ -150,6 +150,7 @@ class Go2PolicyController:
         self.height_map_res = 6.0  # cells per meter
         grid_size = int(2.0 * self.max_height_map_dist * self.height_map_res)  # 12x12
         self.height_map = np.zeros((grid_size, grid_size, 2), dtype=np.float32)
+        self.height_map[:, :, 0] = 1.0  # Initialize height with high value (1m obstacles)
         # height_map[:,:,0] = height (m), height_map[:,:,1] = age (frames since last update)
 
         # self.height_map[i, j, 0] is the height of the highest point located at:
@@ -235,7 +236,7 @@ class Go2PolicyController:
 
     def lidar_callback(self, msg: PointCloud2_):
         """Process lidar data into heightmap"""
-        process_height_map(self.height_map, msg, self.max_height_map_dist, delete_count=50)
+        process_height_map(self.height_map, msg, self.max_height_map_dist, delete_count=5)
         
 
     def Start(self):

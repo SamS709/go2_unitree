@@ -7,7 +7,20 @@ import numpy as np
 from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_
 import struct
 import sys
-np.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=2000)
+np.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=np.inf, edgeitems=100, suppress=True)
+
+# Lidar inclination correction (15 degrees)
+LIDAR_PITCH_DEG = 15.1
+LIDAR_PITCH_RAD = np.deg2rad(LIDAR_PITCH_DEG)
+COS_PITCH = np.cos(LIDAR_PITCH_RAD)
+SIN_PITCH = np.sin(LIDAR_PITCH_RAD)
+
+# Lidar inclination correction (15 degrees)
+LIDAR_PITCH_DEG = 15.1
+LIDAR_PITCH_RAD = np.deg2rad(LIDAR_PITCH_DEG)
+COS_PITCH = np.cos(LIDAR_PITCH_RAD)
+SIN_PITCH = np.sin(LIDAR_PITCH_RAD)
+
 
 
 def pointcloud_to_heightmap(lidar_msg, grid_size=80, map_range=4.0):
@@ -52,11 +65,17 @@ def pointcloud_to_heightmap(lidar_msg, grid_size=80, map_range=4.0):
         if not (np.isfinite(x) and np.isfinite(y) and np.isfinite(z)):
             continue
         
+        # Correct for lidar pitch (rotation around Y-axis)
+        x_corrected = x * COS_PITCH - z * SIN_PITCH
+        z_corrected = x * SIN_PITCH + z * COS_PITCH
+        x, z = x_corrected, z_corrected
+        
         # Convert to grid coordinates (robot at center)
-        grid_x = int((x + map_range/2) / resolution)
+        # Flip x-axis: high x → row 0 (top), low x → row grid_size-1 (bottom)
+        grid_x = grid_size - 1 - int((x + map_range/2) / resolution)
         grid_y = int((y + map_range/2) / resolution)
         
-        if 0 <= grid_x < grid_size and 0 <= grid_y < grid_size:
+        if 0 <= grid_x < grid_size and 0 <= grid_y < grid_size and x>0.5 and y >0.5:
             max_height_map[grid_x, grid_y] = max(max_height_map[grid_x, grid_y], z)
             min_height_map[grid_x, grid_y] = min(min_height_map[grid_x, grid_y], z)
             point_count[grid_x, grid_y] += 1
@@ -101,9 +120,9 @@ def process_height_map(height_map: np.array, lidar_msg: PointCloud2_, max_dist: 
     data_bytes = bytes(lidar_msg.data)
 
     # Clear old data (cells not updated in delete_count frames)
-    # old_cells = height_map[:, :, 1] > delete_count
-    # height_map[old_cells, 0] = 0.0  # Reset height
-    # height_map[old_cells, 1] = 0    # Reset age
+    old_cells = height_map[:, :, 1] > delete_count
+    height_map[old_cells, 0] = 100.0 # Reset height
+    height_map[old_cells, 1] = 0    # Reset age
     
     # Increment age for all cells (vectorized)
     height_map[:, :, 1] += 1
@@ -119,12 +138,18 @@ def process_height_map(height_map: np.array, lidar_msg: PointCloud2_, max_dist: 
         if not (np.isfinite(x) and np.isfinite(y) and np.isfinite(z)):
             continue
         
+        # Correct for lidar pitch (rotation around Y-axis)
+        x_corrected = x * COS_PITCH - z * SIN_PITCH
+        z_corrected = x * SIN_PITCH + z * COS_PITCH
+        x, z = x_corrected, z_corrected
+        
         # Convert to grid coordinates (robot at center)
-        grid_x = int((x + max_dist) / cell_size)
+        # Flip x-axis: high x → row 0 (top), low x → row grid_size-1 (bottom)
+        grid_x = grid_size - 1 - int((x + max_dist) / cell_size)
         grid_y = int((y + max_dist) / cell_size)
         
-        if 0 <= grid_x < grid_size and 0 <= grid_y < grid_size:
-            height_map[grid_x, grid_y, 0] = z
+        if 0 <= grid_x < grid_size and 0 <= grid_y < grid_size and z > 0.0:
+            height_map[grid_x, grid_y, 0] = min(height_map[grid_x, grid_y, 0], z)
             height_map[grid_x, grid_y, 1] = 0
     
     

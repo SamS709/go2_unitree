@@ -10,7 +10,8 @@ from controller.controller import ControllerMsg
 from unitree_sdk2_python.unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
 from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_
 from lidar_utils import pointcloud_to_heightmap, visualize_heightmap, visualize_obstacle_map
-
+import sys
+np.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=np.inf, edgeitems=100, suppress=True)
 from utils import quat_rotate_inverse
 
 
@@ -43,6 +44,7 @@ def get_obs_low_state(
     - obs[46:50] : Foot contacts
     """
     
+    np.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=np.inf, edgeitems=100, suppress=True)
     motor_states = lowstate_msg.motor_state[:12]
     print(height_map[:,:,0])
     current_joint_pos_sdk = np.array([motor_states[i].q for i in range(12)])
