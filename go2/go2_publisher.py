@@ -75,7 +75,7 @@ class Go2PolicyController:
         self.last_commanded_positions = None
         self.stand_down = False
 
-        policy_name = "policy_lidar.pt"
+        policy_name = "policy_asymmetric.pt"
 
         policy_path = os.path.join("resources", "models", policy_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
