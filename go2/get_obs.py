@@ -9,15 +9,15 @@ from utils import Mapper
 from controller.controller import ControllerMsg
 from unitree_sdk2_python.unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
 from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_
-from lidar_utils import pointcloud_to_heightmap, visualize_heightmap, visualize_obstacle_map
-
+import sys
+np.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=np.inf, edgeitems=100, suppress=True)
 from utils import quat_rotate_inverse
 
 
 def get_obs_low_state(
     lowstate_msg: LowState_,
     controller_msg: ControllerMsg,
-    lidar_msg: PointCloud2_,
+    height_map: np.array,
     height: float,
     prev_actions: np.array,
     mapper: Mapper,
@@ -42,40 +42,13 @@ def get_obs_low_state(
     - obs[34:46] : Previous actions (12 values)
     - obs[46:50] : Foot contacts
     """
-
-    # num_points = lidar_msg.width * lidar_msg.height
-    # point_step = lidar_msg.point_step
-    # print("num points: ", num_points)
-    # print("point_step: ", point_step)
-    # print(lidar_msg)
-
-    # MAPPING ROBOT -> POLICY
     
-    #========== CREATE HEIGHT MAP FROM LIDAR ==========
-    # print(lidar_msg)
-    # if lidar_msg is None:
-    #     print("\n[WARNING] lidar_msg is None - no data received\n")
-    # elif len(lidar_msg.data) == 0:
-    #     print(f"\n[WARNING] lidar_msg received but data is empty (length={len(lidar_msg.data)})\n")
-    # else:
-    #     try:
-    #         # Use the utility function to create height map
-    #         height_map, info = pointcloud_to_heightmap(lidar_msg, grid_size=80, map_range=4.0)
-            
-    #         # Visualize the height map
-    #         visualize_heightmap(height_map, info, show_full_stats=True)
-            
-    #         # Display obstacle map (binary: X=obstacle, O=clear)
-    #         visualize_obstacle_map(height_map, info, obstacle_threshold=0.15, display_range=2.0)
-            
-    #     except Exception as e:
-    #         print(f"\n[ERROR] Failed to create height map: {e}")
-    #         import traceback
-    #         traceback.print_exc()
-    # # ===========================================
-    
+    np.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=np.inf, edgeitems=100, suppress=True)
     motor_states = lowstate_msg.motor_state[:12]
-
+    print(height_map[:,:,0])
+    height_map_copy = height_map[:,:,0].copy()
+    height_map_copy[:,:] = np.array([[0.25 for j in range(height_map_copy.shape[0])] for i in range(height_map_copy.shape[0])])
+    
     current_joint_pos_sdk = np.array([motor_states[i].q for i in range(12)])
     current_joint_vel_sdk = np.array([motor_states[i].dq for i in range(12)])
 
@@ -94,7 +67,7 @@ def get_obs_low_state(
     default_pos_policy = mapper.default_pos_policy
 
     # FILLING OBS VECTOR
-    obs = np.zeros(50)
+    obs = np.zeros(50 + height_map_copy.shape[0]**2)
     
     # Base linear velocity (obs[0:3])
 
@@ -143,5 +116,6 @@ def get_obs_low_state(
         float(lowstate_msg.foot_force[2]>20),
         float(lowstate_msg.foot_force[3]>20)
     ]
+    obs[50:] = height_map_copy.flatten()
 
     return obs

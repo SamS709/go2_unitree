@@ -26,6 +26,7 @@ import numpy as np
 import torch
 import os
 from utils import Mapper
+from lidar_utils import process_height_map
 from get_obs import get_obs_low_state
 import time
 import sys
@@ -74,7 +75,7 @@ class Go2PolicyController:
         self.last_commanded_positions = None
         self.stand_down = False
 
-        policy_name = "policy_asymmetric.pt"
+        policy_name = "policy_lidar.pt"
 
         policy_path = os.path.join("resources", "models", policy_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -144,6 +145,19 @@ class Go2PolicyController:
 
         # thread handling
         self.lowCmdWriteThreadPtr = None
+        
+        self.max_height_map_dist = 1.0  # ±1m range
+        self.height_map_res = 6.0  # cells per meter
+        grid_size = int(2.0 * self.max_height_map_dist * self.height_map_res)  # 12x12
+        self.height_map = np.zeros((grid_size, grid_size, 2), dtype=np.float32)
+        self.height_map[:, :, 0] = 1.0  # Initialize height with high value (1m obstacles)
+        # height_map[:,:,0] = height (m), height_map[:,:,1] = age (frames since last update)
+
+        # self.height_map[i, j, 0] is the height of the highest point located at:
+        # - abscissa x in [i * res - max_dist, (i + 1) * res - max_dist] 
+        # - ordinate y in [j * res - max_dist, (j + 1) * res - max_dist] 
+        # self.height_map[i, j, 1] counts how many samples occured since the point has been sampled
+              
 
         self.crc = CRC()
 
@@ -217,14 +231,13 @@ class Go2PolicyController:
 
 
     def joy_callback(self, msg: ControllerMsg):
-        """Log spacemouse state"""
-        print(msg)
+        """Log joysticks state"""
         self.controller_state = msg
 
     def lidar_callback(self, msg: PointCloud2_):
-        """Log spacemouse state"""
-        print(msg)
-        self.lidar_state = msg
+        """Process lidar data into heightmap"""
+        process_height_map(self.height_map, msg, self.max_height_map_dist, delete_count=5)
+        
 
     def Start(self):
         self.lowCmdWriteThreadPtr = RecurrentThread(
@@ -346,7 +359,7 @@ class Go2PolicyController:
 
     def process_control_step(self):
         """Process one control step (called at control_freq Hz)."""
-        self.tick_count += 1
+        self.tick_count += 1        
         self.curr_time = time.perf_counter()
 
         
@@ -390,7 +403,7 @@ class Go2PolicyController:
         obs = get_obs_low_state(
             self.latest_low_state,
             self.controller_state,
-            self.lidar_state,
+            self.height_map,
             height=0.30,
             prev_actions=self.current_action,
             mapper=self.mapper,
