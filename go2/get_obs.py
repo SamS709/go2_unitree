@@ -68,7 +68,7 @@ def get_obs_low_state(
     default_pos_policy = mapper.default_pos_policy
 
     # FILLING OBS VECTOR
-    obs = np.zeros(50 + height_map_copy.shape[0]**2)
+    obs = np.zeros(50 + height_map_copy.size)
     
     # Base linear velocity (obs[0:3])
 
