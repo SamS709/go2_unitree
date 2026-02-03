@@ -46,11 +46,18 @@ from unitree_sdk2_python.unitree_sdk2py.go2.robot_state.robot_state_client impor
 np.set_printoptions(precision=3)
 
 
+"""
+RUN:
+python go2_controller.py
+"""
+
 class Go2PolicyController:
     """RL Policy controller for Unitree Go2 locomotion."""
 
     def __init__(
-        self
+        self,
+        newton = False,
+        lidar_obs = False
         ):
         """
         Initialize the policy controller.
@@ -68,14 +75,14 @@ class Go2PolicyController:
 
         self.step_dt = 1 / 50  # policy freq = 50Hz
         self.run_policy = False # set to false to rely on joy buttons to lauch the policy
-
+        self.lidar_obs = lidar_obs
         # Emergency mode
         self.emergency_mode = False
         self.emergency_mode_start_time = None
         self.last_commanded_positions = None
         self.stand_down = False
 
-        policy_name = "policy_lidar.pt"
+        policy_name = "policy_newton.pt" if newton else "policy.pt"
 
         policy_path = os.path.join("resources", "models", policy_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -407,6 +414,7 @@ class Go2PolicyController:
             height=0.30,
             prev_actions=self.current_action,
             mapper=self.mapper,
+            pass_lidar=self.lidar_obs
         )
         with torch.no_grad():
             obs_tensor = torch.tensor(
@@ -424,12 +432,25 @@ def main():
     print("WARNING: Please ensure there are no obstacles around the robot while running this example.")
     input("Press Enter to continue...")
 
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Go2 RL Policy Controller")
+    parser.add_argument(
+        "--newton", type=bool, default=False, help="If the policy comes from newton, the mapping is not the same"
+    )
+    parser.add_argument(
+        "--lidar", type=bool, default=False, help="Whether to pass the lidar in the observation vector"
+    )
+
+    args = parser.parse_args()
+
+
     if len(sys.argv)>1:
         ChannelFactoryInitialize(0, sys.argv[1])
     else:
         ChannelFactoryInitialize(0)
 
-    custom = Go2PolicyController()
+    custom = Go2PolicyController(newton = args.newton)
     custom.Init()
     custom.Start()
 

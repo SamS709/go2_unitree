@@ -9,7 +9,6 @@ from utils import Mapper
 from controller.controller import ControllerMsg
 from unitree_sdk2_python.unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
 from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_
-from lidar_utils import pointcloud_to_heightmap, visualize_heightmap, visualize_obstacle_map
 import sys
 np.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=np.inf, edgeitems=100, suppress=True)
 from utils import quat_rotate_inverse
@@ -22,6 +21,7 @@ def get_obs_low_state(
     height: float,
     prev_actions: np.array,
     mapper: Mapper,
+    pass_lidar: bool
 ):
     """
     Extract observations from LowState message for RL policy.
@@ -68,8 +68,11 @@ def get_obs_low_state(
     default_pos_policy = mapper.default_pos_policy
 
     # FILLING OBS VECTOR
-    obs = np.zeros(50 + height_map_copy.size)
-    
+    if lidar:
+        obs = np.zeros(50 + height_map_copy.shape[0]**2)
+        obs[50:] = height_map_copy.flatten()
+    else:
+        obs = np.zeros(50)
     # Base linear velocity (obs[0:3])
 
     # Base angular velocity (gyroscope) (obs[0:3])
@@ -117,6 +120,5 @@ def get_obs_low_state(
         float(lowstate_msg.foot_force[2]>20),
         float(lowstate_msg.foot_force[3]>20)
     ]
-    obs[50:] = height_map.flatten()
 
     return obs
