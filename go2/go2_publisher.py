@@ -82,7 +82,7 @@ class Go2PolicyController:
         self.last_commanded_positions = None
         self.stand_down = False
 
-        policy_name = "policy_newton.pt" if newton else "policy.pt"
+        policy_name = "policy_newton.pt" if newton else "policy_asymmetric.pt"
 
         policy_path = os.path.join("resources", "models", policy_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -97,7 +97,8 @@ class Go2PolicyController:
         print("[INFO] Policy loaded successfully")
 
         # Initialize the mapper for the joints and the actions
-        mapping_file = "isaaclab_to_unitree.yaml"
+
+        mapping_file = "newton_to_unitree.yaml" if newton else "isaaclab_to_unitree.yaml"
         mapping_path = os.path.join("resources", "mappings", mapping_file)
 
 
@@ -138,8 +139,8 @@ class Go2PolicyController:
 
         self.kp = 60.0  # Position gain
         self.kd = 5.0  # Velocity gain
-        self.kp_p = 60.0  # Position gain
-        self.kd_p = 5.0  # Velocity gain
+        self.kp_p = 25.0  # Position gain
+        self.kd_p = 0.5 # Velocity gain
         self.action_scale = 0.25  # Scale policy output
 
         # Standing position (default joint positions but coud be different)
@@ -427,30 +428,30 @@ class Go2PolicyController:
 
 
 def main():
-
-
-    print("WARNING: Please ensure there are no obstacles around the robot while running this example.")
-    input("Press Enter to continue...")
-
     import argparse
 
     parser = argparse.ArgumentParser(description="Go2 RL Policy Controller")
     parser.add_argument(
-        "--newton", type=bool, default=False, help="If the policy comes from newton, the mapping is not the same"
+        "--newton", action="store_true", help="If the policy comes from newton, the mapping is not the same"
     )
     parser.add_argument(
-        "--lidar", type=bool, default=False, help="Whether to pass the lidar in the observation vector"
+        "--lidar", action="store_true", help="Whether to pass the lidar in the observation vector"
+    )
+    parser.add_argument(
+        "--interface", type=str, default=None, help="Network interface for channel factory"
     )
 
     args = parser.parse_args()
 
+    print("WARNING: Please ensure there are no obstacles around the robot while running this example.")
+    input("Press Enter to continue...")
 
-    if len(sys.argv)>1:
-        ChannelFactoryInitialize(0, sys.argv[1])
+    if args.interface:
+        ChannelFactoryInitialize(0, args.interface)
     else:
         ChannelFactoryInitialize(0)
-
-    custom = Go2PolicyController(newton = args.newton)
+    custom = Go2PolicyController(newton = args.newton,
+                                 lidar_obs=args.lidar)
     custom.Init()
     custom.Start()
 
