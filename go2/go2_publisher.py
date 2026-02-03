@@ -450,8 +450,7 @@ def main():
         ChannelFactoryInitialize(0, args.interface)
     else:
         ChannelFactoryInitialize(0)
-    custom = Go2PolicyController(newton = args.newton,
-                                 lidar_obs=args.lidar)
+    custom = Go2PolicyController(newton = args.newton)
     custom.Init()
     custom.Start()
 
