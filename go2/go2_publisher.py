@@ -56,7 +56,7 @@ class Go2PolicyController:
 
     def __init__(
         self,
-        newton = False,
+        newton = True,
         lidar_obs = False
         ):
         """
@@ -154,11 +154,17 @@ class Go2PolicyController:
         # thread handling
         self.lowCmdWriteThreadPtr = None
         
-        self.max_height_map_dist = 1.0  # ±1m range
+        self.max_height_map_dist = 1.0  # ±2m range
         self.height_map_res = 6.0  # cells per meter
         grid_size = int(2.0 * self.max_height_map_dist * self.height_map_res)  # 12x12
         self.height_map = np.zeros((grid_size, grid_size, 2), dtype=np.float32)
-        self.height_map[:, :, 0] = 1.0  # Initialize height with high value (1m obstacles)
+        self.min_x = 100.0
+        self.max_x = 0.0
+        self.min_z = 100.0
+        self.max_z = 0.0
+        self.max_x_z = 0.0
+        self.min_x_z = 0.0
+        # self.height_map[:, :, 0] = 1.0  # Initialize height with high value (1m obstacles)
         # height_map[:,:,0] = height (m), height_map[:,:,1] = age (frames since last update)
 
         # self.height_map[i, j, 0] is the height of the highest point located at:
@@ -244,8 +250,17 @@ class Go2PolicyController:
 
     def lidar_callback(self, msg: PointCloud2_):
         """Process lidar data into heightmap"""
-        process_height_map(self.height_map, msg, self.max_height_map_dist, delete_count=5)
-        
+        x_max, x_min, z_max, z_min, max_x_z, min_x_z = process_height_map(self.height_map, msg, self.max_height_map_dist, delete_count=5, min_x = self.min_x, max_x = self.max_x, min_z = self.min_z, max_z = self.max_z)
+        if x_min<self.min_x:
+            self.min_x = x_min
+            self.min_x_z = min_x_z
+        if x_max>self.max_x:
+            self.max_x = x_max
+            self.max_x_z = max_x_z
+        if z_min<self.min_z:
+            self.min_z = z_min
+        if z_max>self.max_z:
+            self.max_z = z_max
 
     def Start(self):
         self.lowCmdWriteThreadPtr = RecurrentThread(
@@ -450,7 +465,7 @@ def main():
         ChannelFactoryInitialize(0, args.interface)
     else:
         ChannelFactoryInitialize(0)
-    custom = Go2PolicyController(newton = args.newton)
+    custom = Go2PolicyController(newton = args.newton, lidar_obs=args.lidar)
     custom.Init()
     custom.Start()
 
@@ -458,7 +473,14 @@ def main():
         # if custom.percent_4 == 1.0: 
         #    time.sleep(1)
         #    print("Done!")
-        #    sys.exit(-1)     
+        #    sys.exit(-1)  
+        # 
+        print("max_x sampled = ", custom.max_x)  
+        print("min_x sampled = ", custom.min_x)  
+        print("max_x_z sampled = ", custom.max_x_z)  
+        print("min_x_z sampled = ", custom.min_x_z)  
+        print("max_z sampled = ", custom.max_z)  
+        print("min_z sampled = ", custom.min_z) 
         time.sleep(1)
 
 
