@@ -46,9 +46,9 @@ def get_obs_low_state(
     
     np.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=np.inf, edgeitems=100, suppress=True)
     motor_states = lowstate_msg.motor_state[:12]
-    print(height_map[:,:,0])
+    # print(height_map[:,:,0])
     height_map_copy = height_map[:,:,0].copy()
-    height_map_copy[:,:] = np.array([[0.25 for j in range(height_map_copy.shape[0])] for i in range(height_map_copy.shape[0])])
+    height_map_copy[:,:] = np.array([[0.25 for j in range(height_map_copy.shape[1])] for i in range(height_map_copy.shape[0])])
     
     current_joint_pos_sdk = np.array([motor_states[i].q for i in range(12)])
     current_joint_vel_sdk = np.array([motor_states[i].dq for i in range(12)])

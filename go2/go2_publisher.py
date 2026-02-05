@@ -36,7 +36,7 @@ from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointClo
 from unitree_sdk2_python.unitree_sdk2py.idl.std_msgs.msg.dds_ import String_
 from unitree_sdk2_python.unitree_sdk2py.idl.default import std_msgs_msg_dds__String_
 
-from unitree_sdk2_python.unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_
+from unitree_sdk2_python.unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, LidarState_
 from unitree_sdk2_python.unitree_sdk2py.core.channel import ChannelPublisher, ChannelFactoryInitialize
 from unitree_sdk2_python.unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2_python.unitree_sdk2py.utils.thread import RecurrentThread
@@ -135,7 +135,6 @@ class Go2PolicyController:
         # Store latest messages
         self.latest_low_state = None
         self.controller_state = None
-        self.lidar_state = None
 
         self.kp = 60.0  # Position gain
         self.kd = 5.0  # Velocity gain
@@ -153,11 +152,10 @@ class Go2PolicyController:
 
         # thread handling
         self.lowCmdWriteThreadPtr = None
-        
+        self.height_map_dims = [1.0, 0.5] 
         self.max_height_map_dist = 1.0  # ±2m range
         self.height_map_res = 6.0  # cells per meter
-        grid_size = int(2.0 * self.max_height_map_dist * self.height_map_res)  # 12x12
-        self.height_map = np.zeros((grid_size, grid_size, 2), dtype=np.float32)
+        self.height_map = np.zeros((int(self.height_map_dims[0] * 2 * self.height_map_res), int(self.height_map_dims[1] * 2 * self.height_map_res), 2), dtype=np.float32)
         self.min_x = 100.0
         self.max_x = 0.0
         self.min_z = 100.0
@@ -250,7 +248,7 @@ class Go2PolicyController:
 
     def lidar_callback(self, msg: PointCloud2_):
         """Process lidar data into heightmap"""
-        x_max, x_min, z_max, z_min, max_x_z, min_x_z = process_height_map(self.height_map, msg, self.max_height_map_dist, delete_count=5, min_x = self.min_x, max_x = self.max_x, min_z = self.min_z, max_z = self.max_z)
+        x_max, x_min, z_max, z_min, max_x_z, min_x_z = process_height_map(self.height_map, msg, self.height_map_dims, delete_count=10, min_x = self.min_x, max_x = self.max_x, min_z = self.min_z, max_z = self.max_z)
         if x_min<self.min_x:
             self.min_x = x_min
             self.min_x_z = min_x_z
@@ -475,12 +473,12 @@ def main():
         #    print("Done!")
         #    sys.exit(-1)  
         # 
-        print("max_x sampled = ", custom.max_x)  
-        print("min_x sampled = ", custom.min_x)  
-        print("max_x_z sampled = ", custom.max_x_z)  
-        print("min_x_z sampled = ", custom.min_x_z)  
-        print("max_z sampled = ", custom.max_z)  
-        print("min_z sampled = ", custom.min_z) 
+        # print("max_x sampled = ", custom.max_x)  
+        # print("min_x sampled = ", custom.min_x)  
+        # print("max_x_z sampled = ", custom.max_x_z)  
+        # print("min_x_z sampled = ", custom.min_x_z)  
+        # print("max_z sampled = ", custom.max_z)  
+        # print("min_z sampled = ", custom.min_z) 
         time.sleep(1)
 
 
