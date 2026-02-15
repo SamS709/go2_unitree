@@ -1,14 +1,13 @@
-import numpy as np
+import torch
 
 def quat_rotate_inverse(q, v):
     q_w, q_x, q_y, q_z = q[0], q[1], q[2], q[3]
-    q_conj = np.array([q_w, -q_x, -q_y, -q_z])
-    t = 2.0 * np.cross(q_conj[1:], v) 
-    return v + q_conj[0] * t + np.cross(q_conj[1:], t)
+    q_conj = torch.tensor([q_w, -q_x, -q_y, -q_z])
+    t = 2.0 * torch.cross(q_conj[1:], v) 
+    return v + q_conj[0] * t + torch.cross(q_conj[1:], t)
 
 
 
-import numpy as np
 import yaml
 import os
 
@@ -91,7 +90,7 @@ class Mapper:
         Returns:
             values_policy: Array of values in policy order (12,)
         """
-        values_policy = np.zeros(12)
+        values_policy = torch.zeros(12)
         for policy_idx, policy_joint_name in enumerate(source_names):
             # Find where this joint appears in SDK order
             sdk_idx = target_names.index(policy_joint_name)
@@ -111,7 +110,7 @@ class Mapper:
         """
 
         # Convert from policy order to SDK order using name-based mapping
-        actions_sdk = np.zeros(12)
+        actions_sdk = torch.zeros(12)
         for policy_idx, policy_joint_name in enumerate(self.source_names):
             sdk_idx = self.target_names.index(policy_joint_name)
             actions_sdk[sdk_idx] = actions_policy_order[policy_idx]

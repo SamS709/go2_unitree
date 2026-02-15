@@ -22,12 +22,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from controller.controller import ControllerMsg
-import numpy as np
 import torch
 import os
 from utils import Mapper
 from lidar_utils import process_height_map
-from get_obs import get_obs_low_state
+from get_obs import get_obs, get_obs_lidar
 import time
 import sys
 from unitree_sdk2_python.unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
@@ -43,7 +42,6 @@ from unitree_sdk2_python.unitree_sdk2py.utils.thread import RecurrentThread
 import unitree_legged_const as go2
 from unitree_sdk2_python.unitree_sdk2py.go2.robot_state.robot_state_client import RobotStateClient
 
-np.set_printoptions(precision=3)
 
 
 """
@@ -57,7 +55,7 @@ class Go2PolicyController:
     def __init__(
         self,
         newton = True,
-        lidar_obs = False
+        lidar = False
         ):
         """
         Initialize the policy controller.
@@ -75,7 +73,9 @@ class Go2PolicyController:
 
         self.step_dt = 1 / 50  # policy freq = 50Hz
         self.run_policy = False # set to false to rely on joy buttons to lauch the policy
-        self.lidar_obs = lidar_obs
+        self.lidar_obs = lidar
+
+    
         # Emergency mode
         self.emergency_mode = False
         self.emergency_mode_start_time = None
@@ -103,7 +103,7 @@ class Go2PolicyController:
 
 
  
-        self.default_pos_sdk = np.array(
+        self.default_pos_sdk = torch.tensor(
             [
                 -0.1,
                 0.8,
@@ -119,7 +119,7 @@ class Go2PolicyController:
                 -1.5,  # RL: hip, thigh, calf (actuators 9-11)
             ]
         )
-        self.stand_down_pos = np.array(
+        self.stand_down_pos = torch.tensor(
             [-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
                              -0.5, 1.36, -2.65, 0.5, 1.36, -2.65]
         )
@@ -130,7 +130,7 @@ class Go2PolicyController:
         )
 
         # Store latest action (for use between policy updates)
-        self.current_action = np.zeros(12)
+        self.current_action = torch.zeros(12)
 
         # Store latest messages
         self.latest_low_state = None
@@ -155,7 +155,7 @@ class Go2PolicyController:
         self.height_map_dims = [1.0, 0.5] 
         self.max_height_map_dist = 1.0  # ±2m range
         self.height_map_res = 6.0  # cells per meter
-        self.height_map = np.zeros((int(self.height_map_dims[0] * 2 * self.height_map_res), int(self.height_map_dims[1] * 2 * self.height_map_res), 2), dtype=np.float32)
+        self.height_map = torch.zeros((int(self.height_map_dims[0] * 2 * self.height_map_res), int(self.height_map_dims[1] * 2 * self.height_map_res), 2), dtype=torch.float32)
         self.min_x = 100.0
         self.max_x = 0.0
         self.min_z = 100.0
@@ -420,22 +420,29 @@ class Go2PolicyController:
             self.policy_control()
 
     def policy_control(self):
+        
+        if self.lidar_obs:
+            obs = get_obs_lidar(
+                self.latest_low_state,
+                self.controller_state,
+                self.height_map,
+                prev_actions=self.current_action,
+                mapper=self.mapper,
+            )
+        else:
+            obs = get_obs(
+                self.latest_low_state,
+                self.controller_state,
+                prev_actions=self.current_action,
+                mapper=self.mapper,
+            )
 
-        obs = get_obs_low_state(
-            self.latest_low_state,
-            self.controller_state,
-            self.height_map,
-            height=0.30,
-            prev_actions=self.current_action,
-            mapper=self.mapper,
-            pass_lidar=self.lidar_obs
-        )
         with torch.no_grad():
             obs_tensor = torch.tensor(
                 obs, dtype=torch.float32, device=self.device
             ).unsqueeze(0)
             actions_tensor = self.policy(obs_tensor)
-        actions_policy_order = actions_tensor.squeeze(0).cpu().numpy()
+        actions_policy_order = actions_tensor.squeeze(0)
         self.current_action = actions_policy_order.copy()
         self.send_motor_commands()
 
