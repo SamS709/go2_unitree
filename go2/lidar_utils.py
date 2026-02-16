@@ -93,8 +93,7 @@ def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowsta
             if z > height_map[grid_x, grid_y, 0]:  # Update if this point is higher
                 height_map[grid_x, grid_y, 0] = z
                 height_map[grid_x, grid_y, 1] = 0  # Reset age for updated cell
-    torch.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=torch.inf, edgeitems=100, suppress=True)
-    print(height_map[:, :, 0])
+    
     return x_max, x_min, z_max, z_min, max_x_z, min_x_z
     
     

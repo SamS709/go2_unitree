@@ -82,7 +82,12 @@ class Go2PolicyController:
         self.last_commanded_positions = None
         self.stand_down = False
 
-        policy_name = "policy_newton.pt" if newton else "policy_asymmetric.pt"
+        if newton:
+            policy_name = "policy_newton.pt"
+        elif lidar:
+            policy_name = "policy_lidar3.pt"
+        else:
+            policy_name = "policy_asymmetric.pt"
 
         policy_path = os.path.join("resources", "models", policy_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -420,6 +425,8 @@ class Go2PolicyController:
             self.policy_control()
 
     def policy_control(self):
+        torch.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=torch.inf, edgeitems=100, suppress=True)
+        print(self.height_map[:, :, 0])
         
         if self.lidar_obs:
             obs = get_obs_lidar(
