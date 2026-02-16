@@ -33,12 +33,12 @@ def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowsta
     data_bytes = bytes(lidar_msg.data)
 
     # Clear old data (cells not updated in delete_count frames)
-    old_cells = height_map[:, :, 1] > delete_count
-    height_map[old_cells, 0] = 0.0 # Reset height
-    height_map[old_cells, 1] = 0    # Reset age
+    old_cells = height_map[1, :, :] > delete_count
+    height_map[0, old_cells] = 0.0 # Reset height
+    height_map[1, old_cells] = 0    # Reset age
     
     # Increment age for all cells (vectorized)
-    height_map[:, :, 1] += 1
+    height_map[1, :, :] += 1
     x_max = 0.0
     x_min = 0.0
     z_max = 0.0
@@ -90,9 +90,9 @@ def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowsta
         elif z < z_min:
             z_min = z
         if 0 <= grid_x < grid_size_x and 0 <= grid_y < grid_size_y:
-            if z > height_map[grid_x, grid_y, 0]:  # Update if this point is higher
-                height_map[grid_x, grid_y, 0] = z
-                height_map[grid_x, grid_y, 1] = 0  # Reset age for updated cell
+            if z > height_map[0, grid_x, grid_y]:  # Update if this point is higher
+                height_map[0, grid_x, grid_y] = z
+                height_map[1, grid_x, grid_y] = 0  # Reset age for updated cell
     
     return x_max, x_min, z_max, z_min, max_x_z, min_x_z
     

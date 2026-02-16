@@ -160,7 +160,7 @@ class Go2PolicyController:
         self.height_map_dims = [1.0, 0.5] 
         self.max_height_map_dist = 1.0  # ±2m range
         self.height_map_res = 6.0  # cells per meter
-        self.height_map = torch.zeros((int(self.height_map_dims[0] * 2 * self.height_map_res), int(self.height_map_dims[1] * 2 * self.height_map_res), 2), dtype=torch.float32)
+        self.height_map = t = torch.zeros((2, 5, 3), dtype = torch.float32)
         self.min_x = 100.0
         self.max_x = 0.0
         self.min_z = 100.0
@@ -425,8 +425,8 @@ class Go2PolicyController:
             self.policy_control()
 
     def policy_control(self):
-        torch.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=torch.inf, edgeitems=100, suppress=True)
-        print(self.height_map[:, :, 0])
+        torch.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=200, edgeitems=100)
+        print(self.height_map[0, :, :])
         
         if self.lidar_obs:
             obs = get_obs_lidar(
