@@ -46,6 +46,9 @@ def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowsta
     max_x_z = 0.0
     min_x_z = 0.0
     
+    # Create temporary max height map for this iteration
+    max_heightmap = torch.full_like(height_map[0], float('-inf'))
+    
     # Project points onto grid
     for i in range(num_points):
         offset = i * point_step
@@ -90,9 +93,13 @@ def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowsta
         elif z < z_min:
             z_min = z
         if 0 <= grid_x < grid_size_x and 0 <= grid_y < grid_size_y:
-            if z > height_map[0, grid_x, grid_y]:  # Update if this point is higher
-                height_map[0, grid_x, grid_y] = z
-                height_map[1, grid_x, grid_y] = 0  # Reset age for updated cell
+            if z > max_heightmap[grid_x, grid_y]:  # Update max for this iteration
+                max_heightmap[grid_x, grid_y] = z
+    
+    # Update height_map with values from max_heightmap where valid points were found
+    valid_cells = max_heightmap != float('-inf')
+    height_map[0, valid_cells] = max_heightmap[valid_cells]
+    height_map[1, valid_cells] = 0  # Reset age for updated cells
     
     return x_max, x_min, z_max, z_min, max_x_z, min_x_z
     
