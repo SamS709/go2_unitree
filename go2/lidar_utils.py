@@ -3,17 +3,19 @@
 Utility functions for processing LiDAR data and creating height maps.
 """
 
-from pyparsing import condition_as_parse_action
 import torch
-from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_, LowState_
+from unitree_sdk2_python.unitree_sdk2py.idl.sensor_msgs.msg.dds_ import PointCloud2_
+from unitree_sdk2_python.unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
+
 import struct
 import sys
 
 # Lidar inclination correction (15 degrees)
-LIDAR_PITCH_DEG = -15.09
+LIDAR_PITCH_DEG = torch.tensor(-15.09)
 LIDAR_PITCH_RAD = torch.deg2rad(LIDAR_PITCH_DEG)
-COS_PITCH_LIDAR = torch.cos(LIDAR_PITCH_RAD)
-SIN_PITCH_LIDAR = torch.sin(LIDAR_PITCH_RAD)
+COS_PITCH_LIDAR = torch.cos(LIDAR_PITCH_RAD).item()
+SIN_PITCH_LIDAR = torch.sin(LIDAR_PITCH_RAD).item()
+
 
 def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowstate_msg: LowState_, height_map_dims: list, delete_count: int = 100, min_x = 0, max_x = 0, min_z = 0, max_z = 0):
     qw = lowstate_msg.imu_state.quaternion[0]

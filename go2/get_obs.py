@@ -195,8 +195,8 @@ def get_obs_lidar(
     obs[21:33] = current_joint_vel_policy
     
     idx = 33+150
-    height_map = height_map_copy - 0.28 
-    obs[33:idx] = height_map
+    height_map_copy = height_map_copy - 0.28 
+    obs[33:idx] = height_map_copy
 
     obs[idx:idx + 12] = prev_actions
 

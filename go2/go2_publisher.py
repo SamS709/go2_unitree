@@ -47,6 +47,7 @@ from unitree_sdk2_python.unitree_sdk2py.go2.robot_state.robot_state_client impor
 """
 RUN:
 python go2_controller.py
+python go2_controller.py --lidar
 """
 
 class Go2PolicyController:
@@ -253,7 +254,7 @@ class Go2PolicyController:
 
     def lidar_callback(self, msg: PointCloud2_):
         """Process lidar data into heightmap"""
-        x_max, x_min, z_max, z_min, max_x_z, min_x_z = process_height_map(self.height_map, msg, self.height_map_dims, delete_count=10, min_x = self.min_x, max_x = self.max_x, min_z = self.min_z, max_z = self.max_z)
+        x_max, x_min, z_max, z_min, max_x_z, min_x_z = process_height_map(self.height_map, msg, self.latest_low_state, self.height_map_dims, delete_count=10, min_x = self.min_x, max_x = self.max_x, min_z = self.min_z, max_z = self.max_z)
         if x_min<self.min_x:
             self.min_x = x_min
             self.min_x_z = min_x_z
@@ -477,7 +478,7 @@ def main():
         ChannelFactoryInitialize(0, args.interface)
     else:
         ChannelFactoryInitialize(0)
-    custom = Go2PolicyController(newton = args.newton, lidar_obs=args.lidar)
+    custom = Go2PolicyController(newton = args.newton, lidar=args.lidar)
     custom.Init()
     custom.Start()
 
