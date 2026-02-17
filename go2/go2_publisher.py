@@ -86,7 +86,7 @@ class Go2PolicyController:
         if newton:
             policy_name = "policy_newton.pt"
         elif lidar:
-            policy_name = "policy_lidar3.pt"
+            policy_name = "policy_lidar4.pt"
         else:
             policy_name = "policy_asymmetric.pt"
 
@@ -158,10 +158,10 @@ class Go2PolicyController:
 
         # thread handling
         self.lowCmdWriteThreadPtr = None
-        self.height_map_dims = [1.0, 0.5] 
-        self.max_height_map_dist = 1.0  # ±2m range
-        self.height_map_res = 6.0  # cells per meter
-        self.height_map = t = torch.zeros((2, 5, 3), dtype = torch.float32)
+        self.x_range = [1.0, -0.5]
+        self.y_range = [-0.5, 0.5]
+        self.res = 0.1
+        self.height_map = torch.zeros((3, 15, 10), dtype = torch.float32)
         self.min_x = 100.0
         self.max_x = 0.0
         self.min_z = 100.0
@@ -254,17 +254,20 @@ class Go2PolicyController:
 
     def lidar_callback(self, msg: PointCloud2_):
         """Process lidar data into heightmap"""
-        x_max, x_min, z_max, z_min, max_x_z, min_x_z = process_height_map(self.height_map, msg, self.latest_low_state, self.height_map_dims, delete_count=10, min_x = self.min_x, max_x = self.max_x, min_z = self.min_z, max_z = self.max_z)
-        if x_min<self.min_x:
-            self.min_x = x_min
-            self.min_x_z = min_x_z
-        if x_max>self.max_x:
-            self.max_x = x_max
-            self.max_x_z = max_x_z
-        if z_min<self.min_z:
-            self.min_z = z_min
-        if z_max>self.max_z:
-            self.max_z = z_max
+        if self.latest_low_state:
+            x_max, x_min, z_max, z_min, max_x_z, min_x_z = process_height_map(self.height_map, msg, self.latest_low_state, self.x_range, self.y_range, self.res, delete_count=5, min_x = self.min_x, max_x = self.max_x, min_z = self.min_z, max_z = self.max_z)
+            if x_min<self.min_x:
+                self.min_x = x_min
+                self.min_x_z = min_x_z
+            if x_max>self.max_x:
+                self.max_x = x_max
+                self.max_x_z = max_x_z
+            if z_min<self.min_z:
+                self.min_z = z_min
+            if z_max>self.max_z:
+                self.max_z = z_max
+        else:
+            print("Waiting for low state")
 
     def Start(self):
         self.lowCmdWriteThreadPtr = RecurrentThread(
@@ -427,7 +430,6 @@ class Go2PolicyController:
 
     def policy_control(self):
         torch.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=200, edgeitems=100)
-        print(self.height_map[0, :, :])
         
         if self.lidar_obs:
             obs = get_obs_lidar(
@@ -451,7 +453,7 @@ class Go2PolicyController:
             ).unsqueeze(0)
             actions_tensor = self.policy(obs_tensor)
         actions_policy_order = actions_tensor.squeeze(0)
-        self.current_action = actions_policy_order.copy()
+        self.current_action = actions_policy_order.clone()
         self.send_motor_commands()
 
 

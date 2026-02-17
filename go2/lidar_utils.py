@@ -17,18 +17,15 @@ COS_PITCH_LIDAR = torch.cos(LIDAR_PITCH_RAD).item()
 SIN_PITCH_LIDAR = torch.sin(LIDAR_PITCH_RAD).item()
 
 
-def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowstate_msg: LowState_, height_map_dims: list, delete_count: int = 100, min_x = 0, max_x = 0, min_z = 0, max_z = 0):
+def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowstate_msg: LowState_, x_range: list, y_range: list, res, delete_count: int = 100, min_x = 0, max_x = 0, min_z = 0, max_z = 0):
     qw = lowstate_msg.imu_state.quaternion[0]
     qx = lowstate_msg.imu_state.quaternion[1] 
     qy = lowstate_msg.imu_state.quaternion[2]  
     qz = lowstate_msg.imu_state.quaternion[3]  
     
-    grid_size_x = height_map.shape[0]
-    grid_size_y = height_map.shape[1]
-    map_range_x = 2.0 * height_map_dims[0]
-    map_range_y = 2.0 * height_map_dims[1]
-    cell_size_x = map_range_x / grid_size_x  # meters per cell
-    cell_size_y = map_range_y / grid_size_y  # meters per cell
+    grid_size_x = height_map.shape[1]
+    grid_size_y = height_map.shape[2]
+
     # Parse pointcloud
     num_points = lidar_msg.width * lidar_msg.height
     point_step = lidar_msg.point_step
@@ -54,9 +51,9 @@ def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowsta
     # Project points onto grid
     for i in range(num_points):
         offset = i * point_step
-        x = struct.unpack_from('f', data_bytes, offset)[0]
-        y = struct.unpack_from('f', data_bytes, offset + 4)[0]
-        z = struct.unpack_from('f', data_bytes, offset + 8)[0]
+        x = torch.tensor(struct.unpack_from('f', data_bytes, offset)[0])
+        y = torch.tensor(struct.unpack_from('f', data_bytes, offset + 4)[0])
+        z = torch.tensor(struct.unpack_from('f', data_bytes, offset + 8)[0])
         
         # Filter invalid points
         if not (torch.isfinite(x) and torch.isfinite(y) and torch.isfinite(z)):
@@ -73,17 +70,17 @@ def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowsta
         SIN_ROLL = 2.0 * (qw * qx + qy * qz)
         COS_ROLL = 1.0 - 2.0 * (qx * qx + qy * qy)
         SIN_PITCH = 2.0 * (qw * qy -qz * qx)
-        COS_PITCH = torch.sqrt(1.0 - torch.square(2.0 * (qw * qy - qz * qx)))
+        COS_PITCH = torch.sqrt(torch.tensor(1.0 - torch.square(torch.tensor(2.0 * (qw * qy - qz * qx)))))
 
         x_corrected = COS_PITCH * x + SIN_ROLL * SIN_PITCH * y - SIN_PITCH * COS_ROLL * z
-        y_corrected = COS_ROLL * y + SIN_ROLL * z
+        y_corrected = COS_PITCH * COS_ROLL * y + COS_PITCH * SIN_ROLL * z
         z_corrected = SIN_PITCH * x - SIN_ROLL * COS_PITCH * y + COS_PITCH * COS_ROLL * z
 
         x, y, z = x_corrected, y_corrected, z_corrected
         # Convert to grid coordinates (robot at center)
         # Flip x-axis: high x → row 0 (top), low x → row grid_size-1 (bottom)
-        grid_x = grid_size_x - 1 - int((x + height_map_dims[0]) / cell_size_x)
-        grid_y = int((y + height_map_dims[1]) / cell_size_y)
+        grid_x = int((x - x_range[1]) / res)
+        grid_y = int((y - y_range[0]) / res)
         if x > x_max:
             x_max = x
             max_x_z = z
@@ -102,7 +99,8 @@ def process_height_map(height_map: torch.tensor, lidar_msg: PointCloud2_, lowsta
     valid_cells = max_heightmap != float('-inf')
     height_map[0, valid_cells] = max_heightmap[valid_cells]
     height_map[1, valid_cells] = 0  # Reset age for updated cells
-    
+    torch.set_printoptions(precision=2, threshold=sys.maxsize, linewidth=200, edgeitems=100)
+    print(height_map[0, :, :])
     return x_max, x_min, z_max, z_min, max_x_z, min_x_z
     
     
